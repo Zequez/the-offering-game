@@ -4,8 +4,9 @@ import Browser
 import Debug exposing (log)
 import Dict exposing (Dict)
 import Html exposing (Attribute, Html, a, button, div, header, input, main_, span, text)
-import Html.Attributes exposing (class, classList, placeholder, style, title)
-import Html.Events exposing (onClick, onInput)
+import Html.Attributes exposing (class, classList, placeholder, style, title, value)
+import Html.Events exposing (keyCode, on, onClick, onInput)
+import Json.Decode as JD
 import List.Extra
 import OfferingGame.Lang as L exposing (Lang)
 import OfferingGame.Participant exposing (ContactChannels, Offering, Participant, blank, zequez)
@@ -21,7 +22,7 @@ type Tab
 
 
 type alias Model =
-    { currentUser : String
+    { currentParticipant : String
     , tab : Tab
     , participants : Dict String Participant
     , editingParticipant : Participant
@@ -55,7 +56,7 @@ main =
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( { currentUser = "zequezzeuqez"
+    ( { currentParticipant = "zequezzeuqez"
       , tab = OfferingsTab
       , participants =
             Dict.fromList
@@ -83,6 +84,8 @@ type Msg
     | ClickTab Tab
     | EditAddTag Tag String
     | EditRemoveTag Int
+    | EditSetDescription String
+    | EditSubmitOffering
     | EditTagFindInput Tag String
 
 
@@ -100,34 +103,50 @@ update msg model =
             ( { model | tab = tab }, Cmd.none )
 
         EditAddTag tag value ->
-            let
-                { editingOffering } =
-                    model
-            in
-            ( { model
-                | editingOffering =
-                    { editingOffering
-                        | tags = ( tag, value ) :: editingOffering.tags
-                    }
-              }
-            , Cmd.none
-            )
+            updateOffering
+                model
+                (\o -> { o | tags = ( tag, value ) :: o.tags })
 
         EditRemoveTag tagIndex ->
-            let
-                { editingOffering } =
-                    model
-            in
-            ( { model
-                | editingOffering =
-                    { editingOffering
-                        | tags =
-                            editingOffering.tags
-                                |> List.Extra.removeAt tagIndex
-                    }
-              }
-            , Cmd.none
-            )
+            updateOffering
+                model
+                (\o -> { o | tags = List.Extra.removeAt tagIndex o.tags })
+
+        EditSetDescription value ->
+            updateOffering model (\o -> { o | description = value })
+
+        EditSubmitOffering ->
+            case Dict.get model.currentParticipant model.participants of
+                Just participant ->
+                    let
+                        { offerings } =
+                            participant
+
+                        editingOffering =
+                            model.editingOffering
+
+                        description =
+                            String.trim editingOffering.description
+                    in
+                    ( if description /= "" && not (List.isEmpty model.editingOffering.tags) then
+                        { model
+                            | editingOffering = { editingOffering | description = "" }
+                            , participants =
+                                model.participants
+                                    |> Dict.insert model.currentParticipant
+                                        { participant
+                                            | offerings =
+                                                model.editingOffering :: offerings
+                                        }
+                        }
+
+                      else
+                        model
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         EditTagFindInput tag value ->
             let
@@ -141,6 +160,15 @@ update msg model =
               }
             , Cmd.none
             )
+
+
+
+-- getCurrentUser String -> Dict String Participant -> Maybe
+
+
+updateOffering : Model -> (Offering -> Offering) -> ( Model, Cmd Msg )
+updateOffering model updateFun =
+    ( { model | editingOffering = updateFun model.editingOffering }, Cmd.none )
 
 
 
@@ -158,7 +186,7 @@ view model =
         currentUser : Maybe Participant
         currentUser =
             model.participants
-                |> Dict.get model.currentUser
+                |> Dict.get model.currentParticipant
     in
     div []
         [ header [ class "bg-green-500 text-white py-4 font-thin" ]
@@ -187,12 +215,10 @@ view model =
                                     [ div [ class "text-xl font-thin mb-2" ]
                                         [ text "My announcements" ]
                                     , div [ class "font-thin" ]
-                                        [ offeringView (Offering "Web, apps, systems development and design" [ ( T.Language, "en" ), ( T.Currency, "seeds" ), ( T.OType, "service" ) ])
-                                        , offeringView (Offering "Couch $200" [ ( T.Language, "en" ), ( T.Region, "mar-del-plata" ), ( T.Currency, "usd" ) ])
-                                        , offeringView (Offering "Abrazo" [ ( T.Language, "es" ), ( T.Region, "mar-del-plata" ) ])
-                                        , offeringView (Offering "10 Seeds for a picture of your cat" [ ( T.Language, "en" ), ( T.Currency, "seeds" ), ( T.OIs, "request" ) ])
-                                        ]
-                                    , offeringEditorView model.editingOffering
+                                        (participant.offerings
+                                            |> List.map (\o -> offeringView o)
+                                        )
+                                    , viewOfferingEditor model.editingOffering
                                     ]
 
                                 Nothing ->
@@ -226,29 +252,43 @@ view model =
 -- Offering Editor
 
 
-offeringEditorView : Offering -> Html Msg
-offeringEditorView offering =
+viewOfferingEditor : Offering -> Html Msg
+viewOfferingEditor { description, tags } =
     div []
         [ div [ class "my-4 text-xl font-thin" ] [ text "Add" ]
         , div [ class "flex h-8 mb-2" ]
-            [ input [ class "border border-gray-400 rounded-md flex-grow mr-4 px-2" ] []
-            , button [ class "bg-green-500 rounded-md px-2 text-white uppercase font-bold cursor-pointer" ]
+            [ input
+                [ class "border border-gray-400 rounded-md flex-grow mr-4 px-2"
+                , onInput EditSetDescription
+                , onEnter EditSubmitOffering
+                , value description
+                ]
+                []
+            , button
+                [ class "bg-green-500 rounded-md px-2 text-white uppercase font-bold cursor-pointer"
+                , onClick EditSubmitOffering
+                ]
                 [ text "Save" ]
             ]
         , div [ class "mb-4 flex" ]
-            (offering.tags |> List.indexedMap (\i ( tag, value ) -> editorTagView tag value i))
+            (tags |> List.indexedMap (\i ( tag, value ) -> viewOfferingEditorTag tag value i))
         , div [ class "" ]
-            [ tagSelectView T.Language [ "es", "en", "pt" ]
-            , tagSelectView T.Region [ "mar-del-plata", "uruguay", "argentina" ]
-            , tagSelectView T.Currency [ "ars", "usd", "seeds" ]
-            , tagSelectView T.OType [ "service", "product", "work", "housing" ]
-            , tagSelectView T.OIs [ "offering", "requesting" ]
+            [ viewTagSelector T.Language [ "es", "en", "pt" ]
+            , viewTagSelector T.Region [ "mar-del-plata", "uruguay", "argentina" ]
+            , viewTagSelector T.Currency [ "ars", "usd", "seeds" ]
+            , viewTagSelector T.OType [ "service", "product", "work", "housing" ]
+            , viewTagSelector T.OIs [ "offering", "requesting" ]
             ]
         ]
 
 
-editorTagView : Tag -> String -> Int -> Html Msg
-editorTagView tag value index =
+
+-- viewOfferingEditorInput : Offering -> Html Msg
+-- viewOfferingEditorInput offering =
+
+
+viewOfferingEditorTag : Tag -> String -> Int -> Html Msg
+viewOfferingEditorTag tag value index =
     button
         [ class "block bg-transparent p-0 cursor-pointer"
         , onClick (EditRemoveTag index)
@@ -257,8 +297,8 @@ editorTagView tag value index =
         ]
 
 
-tagSelectView : Tag -> List String -> Html Msg
-tagSelectView tag tagOptions =
+viewTagSelector : Tag -> List String -> Html Msg
+viewTagSelector tag tagOptions =
     let
         { name, color, emoji } =
             toTagInfo tag
@@ -279,13 +319,13 @@ tagSelectView tag tagOptions =
             ]
         , div [ class "inline-flex text-sm my-2" ]
             (tagOptions
-                |> List.map (\value -> tagSelectOptionView tag value)
+                |> List.map (\value -> viewTagSelectorOption tag value)
             )
         ]
 
 
-tagSelectOptionView : Tag -> String -> Html Msg
-tagSelectOptionView tag value =
+viewTagSelectorOption : Tag -> String -> Html Msg
+viewTagSelectorOption tag value =
     button
         [ class "block mr-1 px-1 bg-transparent cursor-pointer rounded-md hover:bg-gray-300"
         , onClick (EditAddTag tag value)
@@ -355,3 +395,25 @@ tagView tag tagText =
         [ span [ class "bg-black bg-opacity-20 px-1 rounded-l-md" ] [ text emoji ]
         , span [ class "px-1" ] [ text tagText ]
         ]
+
+
+
+-- ██╗  ██╗███████╗██╗     ██████╗ ███████╗██████╗ ███████╗
+-- ██║  ██║██╔════╝██║     ██╔══██╗██╔════╝██╔══██╗██╔════╝
+-- ███████║█████╗  ██║     ██████╔╝█████╗  ██████╔╝███████╗
+-- ██╔══██║██╔══╝  ██║     ██╔═══╝ ██╔══╝  ██╔══██╗╚════██║
+-- ██║  ██║███████╗███████╗██║     ███████╗██║  ██║███████║
+-- ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝
+
+
+onEnter : Msg -> Attribute Msg
+onEnter msg =
+    let
+        isEnter code =
+            if code == 13 then
+                JD.succeed msg
+
+            else
+                JD.fail "not ENTER"
+    in
+    on "keydown" (JD.andThen isEnter keyCode)
