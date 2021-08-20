@@ -5,7 +5,8 @@ import Debug exposing (log)
 import Dict exposing (Dict)
 import Html exposing (Attribute, Html, a, button, div, header, input, main_, span, text)
 import Html.Attributes exposing (class, classList, placeholder, style, title)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
+import List.Extra
 import OfferingGame.Lang as L exposing (Lang)
 import OfferingGame.Participant exposing (ContactChannels, Offering, Participant, blank, zequez)
 import OfferingGame.Tag as T exposing (Tag, toTagInfo)
@@ -24,16 +25,22 @@ type alias Model =
     , tab : Tab
     , participants : Dict String Participant
     , editingParticipant : Participant
+    , editingOffering : Offering
+    , editingTagFindValues : Dict String String
     }
+
+
+
+-- ██╗███╗   ██╗██╗████████╗
+-- ██║████╗  ██║██║╚══██╔══╝
+-- ██║██╔██╗ ██║██║   ██║
+-- ██║██║╚██╗██║██║   ██║
+-- ██║██║ ╚████║██║   ██║
+-- ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝
 
 
 type alias Flags =
     {}
-
-
-type Msg
-    = Noop
-    | ClickTab Tab
 
 
 main : Program Flags Model Msg
@@ -55,9 +62,32 @@ init flags =
                 [ ( "zequezzeuqez", zequez )
                 ]
       , editingParticipant = blank
+      , editingOffering = { description = "", tags = [] }
+      , editingTagFindValues = Dict.fromList []
       }
     , Cmd.none
     )
+
+
+
+-- ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗
+-- ██║   ██║██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔════╝
+-- ██║   ██║██████╔╝██║  ██║███████║   ██║   █████╗
+-- ██║   ██║██╔═══╝ ██║  ██║██╔══██║   ██║   ██╔══╝
+-- ╚██████╔╝██║     ██████╔╝██║  ██║   ██║   ███████╗
+--  ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝
+
+
+type Msg
+    = Noop
+    | ClickTab Tab
+    | EditAddTag Tag String
+    | EditRemoveTag Int
+    | EditTagFindInput Tag String
+
+
+
+-- | EditRemoveTag Tag String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -68,6 +98,58 @@ update msg model =
 
         ClickTab tab ->
             ( { model | tab = tab }, Cmd.none )
+
+        EditAddTag tag value ->
+            let
+                { editingOffering } =
+                    model
+            in
+            ( { model
+                | editingOffering =
+                    { editingOffering
+                        | tags = ( tag, value ) :: editingOffering.tags
+                    }
+              }
+            , Cmd.none
+            )
+
+        EditRemoveTag tagIndex ->
+            let
+                { editingOffering } =
+                    model
+            in
+            ( { model
+                | editingOffering =
+                    { editingOffering
+                        | tags =
+                            editingOffering.tags
+                                |> List.Extra.removeAt tagIndex
+                    }
+              }
+            , Cmd.none
+            )
+
+        EditTagFindInput tag value ->
+            let
+                { name } =
+                    toTagInfo tag
+            in
+            ( { model
+                | editingTagFindValues =
+                    model.editingTagFindValues
+                        |> Dict.insert name value
+              }
+            , Cmd.none
+            )
+
+
+
+-- ██╗   ██╗██╗███████╗██╗    ██╗███████╗
+-- ██║   ██║██║██╔════╝██║    ██║██╔════╝
+-- ██║   ██║██║█████╗  ██║ █╗ ██║███████╗
+-- ╚██╗ ██╔╝██║██╔══╝  ██║███╗██║╚════██║
+--  ╚████╔╝ ██║███████╗╚███╔███╔╝███████║
+--   ╚═══╝  ╚═╝╚══════╝ ╚══╝╚══╝ ╚══════╝
 
 
 view : Model -> Html Msg
@@ -110,23 +192,7 @@ view model =
                                         , offeringView (Offering "Abrazo" [ ( T.Language, "es" ), ( T.Region, "mar-del-plata" ) ])
                                         , offeringView (Offering "10 Seeds for a picture of your cat" [ ( T.Language, "en" ), ( T.Currency, "seeds" ), ( T.OIs, "request" ) ])
                                         ]
-                                    , div [ class "my-4 text-xl font-thin" ] [ text "Add" ]
-                                    , div [ class "flex h-8 mb-2" ]
-                                        [ input [ class "border border-gray-400 rounded-md flex-grow mr-4 px-2" ] []
-                                        , button [ class "bg-green-500 rounded-md px-2 text-white uppercase font-bold cursor-pointer" ]
-                                            [ text "Save" ]
-                                        ]
-                                    , div [ class "mb-4 flex" ]
-                                        [ tagView T.Region "mar-del-plata"
-                                        , tagView T.Region "argentina"
-                                        ]
-                                    , div [ class "" ]
-                                        [ tagSelectView "Language" "🌐" "#cdcb4d" [ "es", "en", "pt" ]
-                                        , tagSelectView "Region" "🌎" "lightblue" [ "mar-del-plata", "uruguay", "argentina" ]
-                                        , tagSelectView "Currency" "💰" "#68cb97" [ "ars", "usd", "seeds" ]
-                                        , tagSelectView "Type" "📄" "orange" [ "service", "product", "work", "housing" ]
-                                        , tagSelectView "Is" "🤝" "gold" [ "offering", "requesting" ]
-                                        ]
+                                    , offeringEditorView model.editingOffering
                                     ]
 
                                 Nothing ->
@@ -156,10 +222,89 @@ view model =
         ]
 
 
+
+-- Offering Editor
+
+
+offeringEditorView : Offering -> Html Msg
+offeringEditorView offering =
+    div []
+        [ div [ class "my-4 text-xl font-thin" ] [ text "Add" ]
+        , div [ class "flex h-8 mb-2" ]
+            [ input [ class "border border-gray-400 rounded-md flex-grow mr-4 px-2" ] []
+            , button [ class "bg-green-500 rounded-md px-2 text-white uppercase font-bold cursor-pointer" ]
+                [ text "Save" ]
+            ]
+        , div [ class "mb-4 flex" ]
+            (offering.tags |> List.indexedMap (\i ( tag, value ) -> editorTagView tag value i))
+        , div [ class "" ]
+            [ tagSelectView T.Language [ "es", "en", "pt" ]
+            , tagSelectView T.Region [ "mar-del-plata", "uruguay", "argentina" ]
+            , tagSelectView T.Currency [ "ars", "usd", "seeds" ]
+            , tagSelectView T.OType [ "service", "product", "work", "housing" ]
+            , tagSelectView T.OIs [ "offering", "requesting" ]
+            ]
+        ]
+
+
+editorTagView : Tag -> String -> Int -> Html Msg
+editorTagView tag value index =
+    button
+        [ class "block bg-transparent p-0 cursor-pointer"
+        , onClick (EditRemoveTag index)
+        ]
+        [ tagView tag value
+        ]
+
+
+tagSelectView : Tag -> List String -> Html Msg
+tagSelectView tag tagOptions =
+    let
+        { name, color, emoji } =
+            toTagInfo tag
+    in
+    div [ class "" ]
+        [ div
+            [ class "shadow-sm py-1 px-2 text-white rounded-md flex items-center"
+            , style "background-color" color
+            , style "text-shadow" "0 1px 0 rgba(0,0,0,0.2)"
+            ]
+            [ div [ class "flex-grow" ] [ text (emoji ++ " " ++ name) ]
+            , input
+                [ class "w-40 ring-1 ring-black ring-opacity-10 rounded-sm"
+                , placeholder "Find / New"
+                , onInput (EditTagFindInput tag)
+                ]
+                []
+            ]
+        , div [ class "inline-flex text-sm my-2" ]
+            (tagOptions
+                |> List.map (\value -> tagSelectOptionView tag value)
+            )
+        ]
+
+
+tagSelectOptionView : Tag -> String -> Html Msg
+tagSelectOptionView tag value =
+    button
+        [ class "block mr-1 px-1 bg-transparent cursor-pointer rounded-md hover:bg-gray-300"
+        , onClick (EditAddTag tag value)
+        ]
+        [ text value ]
+
+
+
+-- Registration
+
+
 registrationView : Participant -> List (Html Msg)
 registrationView participant =
     [ div [ class "text-xl font-thin mb-2" ] [ text "Registration" ]
     ]
+
+
+
+-- Layout
 
 
 tabView : String -> Tab -> Tab -> Html Msg
@@ -181,22 +326,8 @@ tabView txt activeTab onClickTab =
         [ text txt ]
 
 
-tagSelectView : String -> String -> String -> List String -> Html Msg
-tagSelectView tagName tagIcon tagColor tagOptions =
-    div [ class "" ]
-        [ div
-            [ class "shadow-sm py-1 px-2 text-white rounded-md flex items-center"
-            , style "background-color" tagColor
-            , style "text-shadow" "0 1px 0 rgba(0,0,0,0.2)"
-            ]
-            [ div [ class "flex-grow" ] [ text (tagIcon ++ " " ++ tagName) ]
-            , input [ class "w-40 ring-1 ring-black ring-opacity-10 rounded-sm", placeholder "Find / New" ] []
-            ]
-        , div [ class "inline-flex text-sm my-2" ]
-            (tagOptions
-                |> List.map (\o -> div [ class "px-1 cursor-pointer rounded-md hover:bg-gray-300" ] [ text o ])
-            )
-        ]
+
+-- Offering list item
 
 
 offeringView : Offering -> Html Msg
@@ -217,7 +348,7 @@ tagView tag tagText =
             toTagInfo tag
     in
     div
-        [ class "inline-flex rounded-md mr-2 shadow-sm font-normal text-xs"
+        [ class "inline-flex rounded-md shadow-sm font-normal text-xs"
         , style "background-color" color
         , title name
         ]
