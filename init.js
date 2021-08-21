@@ -6,7 +6,7 @@
 // const app = createApp(App, {});
 
 // app.mount("#app");
-
+import "./style.css";
 import { Elm } from "./Main.elm";
 
 Elm.OfferingGame.Main.init({

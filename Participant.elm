@@ -64,8 +64,8 @@ zequez =
     , preferredContact = [ Telegram ]
 
     -- Images URLs
-    , paymentQr = ""
-    , logo = ""
+    , paymentQr = "https://gateway.pinata.cloud/ipfs/QmREAxgB717LJP7kDuLWMQ2t8Rdy4ARdSJVuU5f6x5YZRG"
+    , logo = "https://zequez.space/static/71328c87c8e990b9df27a0bb17a93efc/048da/profile.webp"
 
     -- Location
     , languages = [ L.Es, L.En ]

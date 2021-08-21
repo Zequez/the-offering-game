@@ -3,8 +3,8 @@ module OfferingGame.Main exposing (Model, Msg, main, view)
 import Browser
 import Debug exposing (log)
 import Dict exposing (Dict)
-import Html exposing (Attribute, Html, a, button, div, header, input, main_, span, text)
-import Html.Attributes exposing (class, classList, placeholder, style, title, value)
+import Html exposing (Attribute, Html, a, button, div, header, img, input, main_, span, text)
+import Html.Attributes exposing (class, classList, href, placeholder, src, style, target, title, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Json.Decode as JD
 import List.Extra
@@ -19,6 +19,7 @@ type Tab
     | ListingsTab
     | ParticipantsTab
     | AccountTab
+    | ConnectedTab
 
 
 type alias Model =
@@ -188,63 +189,149 @@ view model =
             model.participants
                 |> Dict.get model.currentParticipant
     in
-    div []
+    div [ class "text-gray-800" ]
         [ header [ class "bg-green-500 text-white py-4 font-thin" ]
-            [ div [ class "max-w-screen-lg mx-auto px-4" ]
+            [ div [ class "max-w-screen-lg mx-auto px-4 text-shadow-1" ]
                 [ div [ class "text-3xl" ]
-                    [ text "Offering game" ]
-                , div [ class "text-sm" ]
-                    [ text "A space for sharing" ]
+                    [ text "The Offering game" ]
+                , a
+                    [ class "text-sm text-white"
+                    , href "https://zequez.notion.site/The-Offering-Game-1f5029a9e4234359905b97ace98c8d1e"
+                    , target "_blank"
+                    ]
+                    [ text "📖 Read the game guide" ]
                 ]
             ]
-        , main_ [ class "" ]
-            [ div [ class "h-12 bg-gray-200" ]
-                [ div [ class "max-w-screen-lg mx-auto px-4 flex h-full uppercase" ]
-                    [ tabView "Listings" model.tab ListingsTab
-                    , tabView "Participants" model.tab ParticipantsTab
-                    , tabView "My announcements" model.tab OfferingsTab
-                    , tabView "My account" model.tab AccountTab
+        , main_ [ class "pb-12" ]
+            [ div [ class "fixed bottom-0 w-full h-12 bg-gray-200 border-t-1 border-gray-300" ]
+                [ div [ class "flex justify-center h-full uppercase" ]
+                    [ tabView "🔎" model.tab ListingsTab
+                    , tabView "👥" model.tab ParticipantsTab
+                    , tabView "🎁" model.tab OfferingsTab
+                    , tabView "🧙" model.tab AccountTab
+                    , tabView "🤝" model.tab ConnectedTab
                     ]
                 ]
-            , div [ class "max-w-screen-lg mx-auto p-4" ]
-                [ div [ class "bg-white rounded-md shadow-md p-4" ]
-                    (case model.tab of
-                        OfferingsTab ->
-                            case currentUser of
-                                Just participant ->
-                                    [ div [ class "text-xl font-thin mb-2" ]
-                                        [ text "My announcements" ]
-                                    , div [ class "font-thin" ]
-                                        (participant.offerings
-                                            |> List.map (\o -> offeringView o)
-                                        )
+            , div [ class "" ]
+                (case model.tab of
+                    OfferingsTab ->
+                        case currentUser of
+                            Just participant ->
+                                [ viewTabTitle "My announcements"
+                                , viewTabContent
+                                    [ if List.isEmpty participant.offerings then
+                                        div [ class "font-thin opacity-30 text-2xl text-center" ] [ text "You've got no announcements" ]
+
+                                      else
+                                        div [ class "font-thin" ]
+                                            (participant.offerings
+                                                |> List.map (\o -> offeringView o)
+                                            )
                                     , viewOfferingEditor model.editingOffering
                                     ]
+                                ]
 
-                                Nothing ->
-                                    registrationView model.editingParticipant
+                            Nothing ->
+                                registrationView model.editingParticipant
 
-                        AccountTab ->
-                            case currentUser of
-                                Just participant ->
-                                    [ div [ class "text-xl font-thin mb-2" ] [ text "My account" ]
-                                    ]
+                    AccountTab ->
+                        case currentUser of
+                            Just participant ->
+                                [ viewTabTitle "My account", viewTabContent [] ]
 
-                                Nothing ->
-                                    registrationView model.editingParticipant
+                            Nothing ->
+                                registrationView model.editingParticipant
 
-                        ParticipantsTab ->
-                            [ div [ class "text-xl font-thin" ]
-                                [ text "Participants" ]
-                            ]
+                    ParticipantsTab ->
+                        [ viewTabTitle "Participants"
+                        , viewTabContent
+                            (Dict.values model.participants |> List.map viewParticipantHeader)
+                        ]
 
-                        ListingsTab ->
-                            [ div [ class "text-xl font-thin" ]
-                                [ text "Listings" ]
-                            ]
-                    )
+                    ListingsTab ->
+                        [ viewTabTitle "Listings"
+                        , viewTabContent (viewListing (Dict.values model.participants))
+                        ]
+
+                    ConnectedTab ->
+                        [ viewTabTitle "Connected", viewTabContent [] ]
+                )
+            ]
+        ]
+
+
+viewTabTitle : String -> Html Msg
+viewTabTitle tabTitle =
+    div [ class "bg-green-400 " ]
+        [ div
+            [ class "max-w-screen-lg mx-auto text-white font-light pl-4 py-2 text-xl text-shadow-1"
+            ]
+            [ text tabTitle ]
+        ]
+
+
+viewTabContent : List (Html Msg) -> Html Msg
+viewTabContent children =
+    div [ class "max-w-screen-lg mx-auto" ]
+        [ div [ class "bg-white rounded-md shadow-md p-4 m-4 " ] children
+        ]
+
+
+
+-- Listing
+
+
+viewListing : List Participant -> List (Html Msg)
+viewListing participants =
+    participants
+        |> List.map viewListingParticipant
+
+
+viewParticipantHeader : Participant -> Html Msg
+viewParticipantHeader { name, seedsAccountName, logo, paymentQr } =
+    div [ class "flex flex-wrap items-center bg-gray-100 p-1 rounded-l-[26px] rounded-r-[18px]" ]
+        [ div [ class "flex items-center" ]
+            [ img [ src logo, class "h-12 rounded-full mr-4 shadow-sm" ]
+                []
+            , div [ class "" ]
+                [ div [ class "font-thin mr-2" ] [ text name ]
+                , div [ class "font-thin text-gray-400 text-sm -mt-1" ] [ text seedsAccountName ]
                 ]
             ]
+        , div [ class "flex flex-grow justify-end" ]
+            [ button [ class """
+                flex items-center h-8  p-0 pr-3 mr-2
+                rounded-full bg-green-500
+                text-white uppercase font-bold
+                cursor-pointer hover:bg-green-400
+            """ ]
+                [ img [ src paymentQr, class "h-6 mr-2 ml-1 rounded-full" ] []
+                , text "Give"
+                ]
+            , button
+                [ class """
+                flex items-center h-8  p-0 pr-3
+                rounded-full bg-green-500
+                text-white uppercase font-bold
+                cursor-pointer hover:bg-green-400
+            """ ]
+                [ span [ class "text-2xl mx-2" ] [ text "🤝" ]
+
+                -- img [ src paymentQr, class "h-6 mr-2 ml-1 rounded-full" ] []
+                , text "Connect"
+                ]
+            ]
+        ]
+
+
+viewListingParticipant : Participant -> Html Msg
+viewListingParticipant participant =
+    div []
+        [ viewParticipantHeader participant
+        , div [ class "py-2" ]
+            (participant.offerings
+                |> List.map (\o -> offeringView o)
+            )
         ]
 
 
@@ -255,29 +342,42 @@ view model =
 viewOfferingEditor : Offering -> Html Msg
 viewOfferingEditor { description, tags } =
     div []
-        [ div [ class "my-4 text-xl font-thin" ] [ text "Add" ]
+        [ div [ class "my-4 text-xl font-thin" ] [ text "Add new" ]
         , div [ class "flex h-8 mb-2" ]
             [ input
-                [ class "border border-gray-400 rounded-md flex-grow mr-4 px-2"
+                [ class "border border-gray-400 text-lg font-light rounded-md flex-grow mr-4 px-2 focus:ring-3 ring-green-500 outline-none"
                 , onInput EditSetDescription
                 , onEnter EditSubmitOffering
                 , value description
                 ]
                 []
             , button
-                [ class "bg-green-500 rounded-md px-2 text-white uppercase font-bold cursor-pointer"
+                [ class "bg-green-500 rounded-md px-2 text-white uppercase font-bold cursor-pointer focus:ring-3 ring-green-600 outline-none"
                 , onClick EditSubmitOffering
                 ]
                 [ text "Save" ]
             ]
         , div [ class "mb-4 flex" ]
             (tags |> List.indexedMap (\i ( tag, value ) -> viewOfferingEditorTag tag value i))
-        , div [ class "" ]
+        , div [ class "my-4 text-xl font-thin" ] [ text "Pick tags" ]
+        , div [ class "mb-4" ]
             [ viewTagSelector T.Language [ "es", "en", "pt" ]
             , viewTagSelector T.Region [ "mar-del-plata", "uruguay", "argentina" ]
             , viewTagSelector T.Currency [ "ars", "usd", "seeds" ]
             , viewTagSelector T.OType [ "service", "product", "work", "housing" ]
             , viewTagSelector T.OIs [ "offering", "requesting" ]
+            ]
+        , div [ class "text-right" ]
+            [ a
+                [ class """
+                    my-4 px-4 py-2
+                    text-white font-bold font-thin text-sm text-right uppercase no-underline
+                    rounded-lg bg-green-500
+                """
+                , target "_blank"
+                , href "https://github.com/Zequez/the-offering-game/issues/new?title=New%20tag%20type"
+                ]
+                [ text "Request new tag type ›" ]
             ]
         ]
 
@@ -305,9 +405,8 @@ viewTagSelector tag tagOptions =
     in
     div [ class "" ]
         [ div
-            [ class "shadow-sm py-1 px-2 text-white rounded-md flex items-center"
+            [ class "shadow-sm py-1 px-2 text-white rounded-md flex items-center text-shadow-1"
             , style "background-color" color
-            , style "text-shadow" "0 1px 0 rgba(0,0,0,0.2)"
             ]
             [ div [ class "flex-grow" ] [ text (emoji ++ " " ++ name) ]
             , input
@@ -339,8 +438,7 @@ viewTagSelectorOption tag value =
 
 registrationView : Participant -> List (Html Msg)
 registrationView participant =
-    [ div [ class "text-xl font-thin mb-2" ] [ text "Registration" ]
-    ]
+    [ viewTabTitle "Registration", viewTabContent [] ]
 
 
 
@@ -354,9 +452,9 @@ tabView txt activeTab onClickTab =
             activeTab == onClickTab
     in
     button
-        [ class "uppercase px-4 pt-1 tracking-wide bg-transparent border-b-3  border-transparent cursor-pointer"
+        [ class "uppercase px-4 pt-1 text-2xl tracking-wide bg-transparent border-b-3  border-transparent cursor-pointer"
         , classList
-            [ ( "bg-gray-100 border-green-500"
+            [ ( "bg-gray-50 border-green-500 shadow-md"
               , isActive
               )
             , ( "hover:bg-gray-100 hover:border-gray-300", not isActive )
@@ -372,11 +470,16 @@ tabView txt activeTab onClickTab =
 
 offeringView : Offering -> Html Msg
 offeringView { description, tags } =
-    div [ class "border-b-1 border-gray-300 last:border-0 border-dashed text-gray-800 py-2 text-sm rounded-sm flex flex-wrap" ]
-        [ div [ class "mb-1 flex-grow" ] [ text description ]
-        , div [ class "" ]
+    div [ class """
+        flex flex-wrap items-center px-2 py-1
+        text-sm  rounded-full
+        hover:bg-gray-100
+        cursor-pointer
+    """ ]
+        [ div [ class "flex-grow" ] [ text description ]
+        , div [ class "flex flex-wrap" ]
             (tags
-                |> List.map (\( tag, tagTxt ) -> tagView tag tagTxt)
+                |> List.map (\( tag, tagTxt ) -> span [ class "ml-1" ] [ tagView tag tagTxt ])
             )
         ]
 
@@ -388,7 +491,7 @@ tagView tag tagText =
             toTagInfo tag
     in
     div
-        [ class "inline-flex rounded-md shadow-sm font-normal text-xs"
+        [ class "flex rounded-md shadow-sm font-normal text-xs"
         , style "background-color" color
         , title name
         ]
