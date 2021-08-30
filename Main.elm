@@ -3,8 +3,8 @@ module OfferingGame.Main exposing (Model, Msg, main, view)
 import Browser
 import Debug exposing (log)
 import Dict exposing (Dict)
-import Html exposing (Attribute, Html, a, button, div, header, img, input, main_, span, text)
-import Html.Attributes exposing (class, classList, href, placeholder, src, style, target, title, value)
+import Html exposing (Attribute, Html, a, button, div, header, img, input, label, main_, span, text)
+import Html.Attributes exposing (checked, class, classList, href, placeholder, src, style, target, title, type_, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Json.Decode as JD
 import List.Extra
@@ -88,6 +88,7 @@ type Msg
     | EditSetDescription String
     | EditSubmitOffering
     | EditTagFindInput Tag String
+    | ParticipantSet
 
 
 
@@ -162,6 +163,9 @@ update msg model =
             , Cmd.none
             )
 
+        ParticipantSet ->
+            ( model, Cmd.none )
+
 
 
 -- getCurrentUser String -> Dict String Participant -> Maybe
@@ -193,7 +197,7 @@ view model =
         [ header [ class "bg-green-500 text-white py-4 font-thin" ]
             [ div [ class "max-w-screen-lg mx-auto px-4 text-shadow-1" ]
                 [ div [ class "text-3xl" ]
-                    [ text "The Offering game" ]
+                    [ text "The Offering Game" ]
                 , a
                     [ class "text-sm text-white"
                     , href "https://zequez.notion.site/The-Offering-Game-1f5029a9e4234359905b97ace98c8d1e"
@@ -208,8 +212,8 @@ view model =
                     [ tabView "🔎" model.tab ListingsTab
                     , tabView "👥" model.tab ParticipantsTab
                     , tabView "🎁" model.tab OfferingsTab
-                    , tabView "🧙" model.tab AccountTab
                     , tabView "🤝" model.tab ConnectedTab
+                    , tabView "🧙" model.tab AccountTab
                     ]
                 ]
             , div [ class "" ]
@@ -237,7 +241,9 @@ view model =
                     AccountTab ->
                         case currentUser of
                             Just participant ->
-                                [ viewTabTitle "My account", viewTabContent [] ]
+                                [ viewTabTitle participant.name
+                                , viewTabContent [ viewParticipant participant ]
+                                ]
 
                             Nothing ->
                                 registrationView model.editingParticipant
@@ -260,6 +266,10 @@ view model =
         ]
 
 
+
+-- Layout
+
+
 viewTabTitle : String -> Html Msg
 viewTabTitle tabTitle =
     div [ class "bg-green-400 " ]
@@ -274,6 +284,75 @@ viewTabContent : List (Html Msg) -> Html Msg
 viewTabContent children =
     div [ class "max-w-screen-lg mx-auto" ]
         [ div [ class "bg-white rounded-md shadow-md p-4 m-4 " ] children
+        ]
+
+
+
+-- Participant
+
+
+viewParticipant : Participant -> Html Msg
+viewParticipant participant =
+    div []
+        [ viewInput "Seeds Account" participant.seedsAccountName ParticipantSet
+        , viewInput "Name" participant.name ParticipantSet
+        , viewCheckboxInput "Is Organization" participant.isOrganization ParticipantSet
+        , viewInput "Contact name" participant.contactName ParticipantSet
+        , viewInput "Description" participant.description ParticipantSet
+        , viewInput "URL" participant.url ParticipantSet
+        , viewCheckboxInput "Accepts Donations" participant.acceptsDonations ParticipantSet
+        , viewFormSection "Contact channels"
+        , viewInput "Discord" participant.discord ParticipantSet
+        , viewInput "Email" participant.email ParticipantSet
+        , viewInput "Phone" participant.phone ParticipantSet
+        , viewInput "Telegram" participant.telegram ParticipantSet
+        , viewInput "Whatsapp" participant.whatsapp ParticipantSet
+        , viewInput "Instagram" participant.instagram ParticipantSet
+        , viewFormSection "Images"
+        , viewInput "Payment QR" participant.paymentQr ParticipantSet
+        , viewInput "Logo" participant.logo ParticipantSet
+        , viewFormSection "Location"
+        , viewInput "Country" participant.country ParticipantSet
+        , viewInput "Region" participant.region ParticipantSet
+        , viewInput "City" participant.city ParticipantSet
+        ]
+
+
+viewFormSection : String -> Html Msg
+viewFormSection title =
+    div [ class "mb-4 text-xl text-center font-light" ] [ text title ]
+
+
+viewCheckboxInput : String -> Bool -> Msg -> Html Msg
+viewCheckboxInput labl val onChange =
+    label [ class "flex mb-4" ]
+        [ div [ class "w-40 flex items-center justify-end pr-4 text-xs leading-tight text-right" ]
+            [ text labl
+            ]
+        , div [ class "w-80 " ]
+            [ input
+                [ checked val
+                , type_ "checkbox"
+                , class """h-10 w-10 m-0 bg-gray-100 rounded-md shadow-inner
+            border-1 border-gray-200
+            focus:(ring-3 ring-green-500 outline-none)"""
+                ]
+                []
+            ]
+        ]
+
+
+viewInput : String -> String -> Msg -> Html Msg
+viewInput label val onChange =
+    div [ class "flex mb-4" ]
+        [ div [ class "w-40 flex items-center justify-end pr-4 text-xs leading-tight text-right" ] [ text label ]
+        , input
+            [ value val
+            , class """h-10 w-80 px-4 bg-gray-100 rounded-md shadow-inner
+            border-1 border-gray-200 text-base text-gray-700
+            focus:(ring-3 ring-green-500 outline-none)"""
+            ]
+            []
         ]
 
 
